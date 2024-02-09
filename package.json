@@ -3,9 +3,9 @@
     "homepage": "https://graphhopper.com/maps/",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/graphhopper/graphhopper-maps.git"
+        "url": "git+https://github.com/cyberdotgent/graphhopper-maps.git"
     },
-    "version": "0.7",
+    "version": "0.7.0",
     "license": "Apache-2.0",
     "scripts": {
         "format": "prettier --write \"src/**/*.{css,ts,tsx,html}\" \"test/**/*.{js,ts,jsx,tsx}\" \"jest.config.js\" \"webpack.*.js\" \"config.js\"",
