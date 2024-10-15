@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 import fetchMock from 'jest-fetch-mock'
-import { ErrorAction, InfoReceived, RouteRequestFailed, RouteRequestSuccess } from '@/actions/Actions'
+import { RouteRequestFailed, RouteRequestSuccess } from '@/actions/Actions'
 import { setTranslation } from '@/translation/Translation'
 
 import Dispatcher from '@/stores/Dispatcher'
@@ -111,10 +111,12 @@ describe('route', () => {
             instructions: true,
             locale: 'en_US',
             points_encoded: true,
+            points_encoded_multiplier: 1e6,
             snap_preventions: ['ferry'],
             details: [
                 'road_class',
                 'road_environment',
+                'road_access',
                 'surface',
                 'max_speed',
                 'average_speed',
@@ -152,10 +154,12 @@ describe('route', () => {
             instructions: true,
             locale: 'en_US',
             points_encoded: true,
+            points_encoded_multiplier: 1e6,
             snap_preventions: ['ferry'],
             details: [
                 'road_class',
                 'road_environment',
+                'road_access',
                 'surface',
                 'max_speed',
                 'average_speed',
@@ -202,10 +206,12 @@ describe('route', () => {
             instructions: true,
             locale: 'en_US',
             points_encoded: true,
+            points_encoded_multiplier: 1e6,
             snap_preventions: ['ferry'],
             details: [
                 'road_class',
                 'road_environment',
+                'road_access',
                 'surface',
                 'max_speed',
                 'average_speed',
@@ -308,10 +314,12 @@ describe('route', () => {
             instructions: true,
             locale: 'de_DE',
             points_encoded: true,
+            points_encoded_multiplier: 1e6,
             snap_preventions: ['ferry'],
             details: [
                 'road_class',
                 'road_environment',
+                'road_access',
                 'surface',
                 'max_speed',
                 'average_speed',

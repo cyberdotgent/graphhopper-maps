@@ -193,7 +193,7 @@ export default class QueryStore extends Store<QueryStoreState> {
                 queryPoints: newPoints,
             }
 
-            return this.routeIfReady(newState, true)
+            return this.routeIfReady(newState, action.zoom)
         } else if (action instanceof SetQueryPoints) {
             // make sure that some things are set correctly, regardless of what was passed in here.
             const queryPoints = action.queryPoints.map((point, i) => {
@@ -242,7 +242,7 @@ export default class QueryStore extends Store<QueryStoreState> {
                 ...state,
                 queryPoints: newPoints,
             }
-            return this.routeIfReady(newState, true)
+            return this.routeIfReady(newState, false)
         } else if (action instanceof InfoReceived) {
             // Do nothing if no routing profiles were received
             if (action.result.profiles.length <= 0) return state
@@ -344,7 +344,8 @@ export default class QueryStore extends Store<QueryStoreState> {
                 if (
                     state.queryPoints.length === 2 &&
                     state.maxAlternativeRoutes > 1 &&
-                    (ApiImpl.isMotorVehicle(state.routingProfile.name) || maxDistance < 500_000)
+                    ((ApiImpl.isMotorVehicle(state.routingProfile.name) && maxDistance < 7_000_000) ||
+                        maxDistance < 500_000)
                 )
                     requests.push(QueryStore.buildRouteRequest(state))
             }

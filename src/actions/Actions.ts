@@ -2,6 +2,7 @@ import { Action } from '@/stores/Dispatcher'
 import { Coordinate, QueryPoint } from '@/stores/QueryStore'
 import { ApiInfo, Bbox, Path, RoutingArgs, RoutingProfile, RoutingResult } from '@/api/graphhopper'
 import { PathDetailsPoint } from '@/stores/PathDetailsStore'
+import { POI } from '@/stores/POIsStore'
 import { Settings } from '@/stores/SettingsStore'
 
 export class InfoReceived implements Action {
@@ -40,11 +41,13 @@ export class AddPoint implements Action {
     readonly atIndex: number
     readonly coordinate: Coordinate
     readonly isInitialized: boolean
+    readonly zoom: boolean
 
-    constructor(atIndex: number, coordinate: Coordinate, isInitialized: boolean) {
+    constructor(atIndex: number, coordinate: Coordinate, isInitialized: boolean, zoom: boolean) {
         this.atIndex = atIndex
         this.coordinate = coordinate
         this.isInitialized = isInitialized
+        this.zoom = zoom
     }
 }
 
@@ -179,11 +182,9 @@ export class MapIsLoaded implements Action {}
 
 export class ZoomMapToPoint implements Action {
     readonly coordinate: Coordinate
-    readonly zoom: number
 
-    constructor(coordinate: Coordinate, zoom: number) {
+    constructor(coordinate: Coordinate) {
         this.coordinate = coordinate
-        this.zoom = zoom
     }
 }
 
@@ -244,5 +245,21 @@ export class UpdateSettings implements Action {
 
     constructor(updatedSettings: Partial<Settings>) {
         this.updatedSettings = updatedSettings
+    }
+}
+
+export class SelectPOI implements Action {
+    readonly selected: POI | null
+
+    constructor(selected: POI | null) {
+        this.selected = selected
+    }
+}
+
+export class SetPOIs implements Action {
+    readonly pois: POI[]
+
+    constructor(pois: POI[]) {
+        this.pois = pois
     }
 }

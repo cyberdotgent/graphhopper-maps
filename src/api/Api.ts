@@ -8,6 +8,7 @@ import {
     Path,
     RawPath,
     RawResult,
+    ReverseGeocodingHit,
     RoutingArgs,
     RoutingProfile,
     RoutingRequest,
@@ -16,6 +17,8 @@ import {
 import { LineString } from 'geojson'
 import { getTranslation, tr } from '@/translation/Translation'
 import * as config from 'config'
+import { Coordinate } from '@/stores/QueryStore'
+import { POIQuery } from '@/pois/AddressParseResult'
 
 interface ApiProfile {
     name: string
@@ -28,7 +31,9 @@ export default interface Api {
 
     routeWithDispatch(args: RoutingArgs, zoom: boolean): void
 
-    geocode(query: string, provider: string): Promise<GeocodingResult>
+    geocode(query: string, provider: string, additionalOptions?: Record<string, string>): Promise<GeocodingResult>
+
+    reverseGeocode(query: POIQuery, bbox: Bbox): Promise<ReverseGeocodingHit[]>
 
     supportsGeocoding(): boolean
 }
@@ -79,7 +84,11 @@ export class ApiImpl implements Api {
         }
     }
 
-    async geocode(query: string, provider: string): Promise<GeocodingResult> {
+    async geocode(
+        query: string,
+        provider: string,
+        additionalOptions?: Record<string, string>
+    ): Promise<GeocodingResult> {
         if (!this.supportsGeocoding())
             return {
                 hits: [],
@@ -96,6 +105,12 @@ export class ApiImpl implements Api {
         url.searchParams.append('osm_tag', '!boundary')
         url.searchParams.append('osm_tag', '!historic')
 
+        if (additionalOptions) {
+            for (const key in additionalOptions) {
+                url.searchParams.append(key, additionalOptions[key])
+            }
+        }
+
         const response = await fetch(url.toString(), {
             headers: { Accept: 'application/json' },
         })
@@ -104,6 +119,69 @@ export class ApiImpl implements Api {
             return (await response.json()) as GeocodingResult
         } else {
             throw new Error('Geocoding went wrong ' + response.status)
+        }
+    }
+
+    async reverseGeocode(query: POIQuery, bbox: Bbox): Promise<ReverseGeocodingHit[]> {
+        if (!this.supportsGeocoding()) return []
+        // why is main overpass api so much faster?
+        // const url = 'https://overpass.kumi.systems/api/interpreter'
+        const url = 'https://overpass-api.de/api/interpreter'
+
+        // bbox of overpass is minLat, minLon, maxLat, maxLon
+        let minLat = bbox[1],
+            minLon = bbox[0],
+            maxLat = bbox[3],
+            maxLon = bbox[2]
+
+        // Reduce the bbox to improve overpass response time for larger cities or areas.
+        // This might lead to empty responses for POI queries with a small result set.
+        if (maxLat - minLat > 0.3) {
+            const centerLat = (maxLat + minLat) / 2
+            maxLat = centerLat + 0.15
+            minLat = centerLat - 0.15
+        }
+        if (maxLon - minLon > 0.3) {
+            const centerLon = (maxLon + minLon) / 2
+            maxLon = centerLon + 0.15
+            minLon = centerLon - 0.15
+        }
+
+        let queryString = ''
+        for (const q of query.queries) {
+            // nwr means it searches for nodes, ways and relations
+            queryString += 'nwr'
+            for (const p of q.phrases) {
+                if (p.sign == '=' && p.v == '*') queryString += `["${p.k}"]`
+                else if (p.ignoreCase) queryString += `["${p.k}"${p.sign}"${p.v}", i]`
+                else queryString += `["${p.k}"${p.sign}"${p.v}"]`
+            }
+            queryString += `;\n`
+        }
+
+        try {
+            const data = `[out:json][timeout:15][bbox:${minLat}, ${minLon}, ${maxLat}, ${maxLon}];\n(${queryString});\nout center 100;`
+            console.log(data)
+            const result = await fetch(url, {
+                method: 'POST',
+                body: 'data=' + encodeURIComponent(data),
+            })
+            const json = await result.json()
+            if (json.elements) {
+                const res = (json.elements as any[])
+                    .map(e => {
+                        if (e.center) {
+                            return { ...e, point: { lat: e.center.lat, lng: e.center.lon } } as ReverseGeocodingHit
+                        } else {
+                            return { ...e, point: { lat: e.lat, lng: e.lon } } as ReverseGeocodingHit
+                        }
+                    })
+                    .filter(p => !!p.tags && p.point)
+                return res
+            } else return []
+        } catch (error) {
+            console.warn('error occured ' + error)
+            return []
         }
     }
 
@@ -204,6 +282,7 @@ export class ApiImpl implements Api {
             instructions: true,
             locale: getTranslation().getLang(),
             points_encoded: true,
+            points_encoded_multiplier: 1e6,
             snap_preventions: config.request?.snapPreventions ? config.request.snapPreventions : [],
             ...profileConfig,
             details: details,
@@ -274,21 +353,23 @@ export class ApiImpl implements Api {
     }
 
     private static decodePoints(path: RawPath, is3D: boolean) {
-        if (path.points_encoded)
+        if (path.points_encoded) {
+            const multiplier = path.points_encoded_multiplier || 1e5
             return {
                 type: 'LineString',
-                coordinates: ApiImpl.decodePath(path.points as string, is3D),
+                coordinates: ApiImpl.decodePath(path.points as string, is3D, multiplier),
             }
-        else return path.points as LineString
+        } else return path.points as LineString
     }
 
     private static decodeWaypoints(path: RawPath, is3D: boolean) {
-        if (path.points_encoded)
+        if (path.points_encoded) {
+            const multiplier = path.points_encoded_multiplier || 1e5
             return {
                 type: 'LineString',
-                coordinates: ApiImpl.decodePath(path.snapped_waypoints as string, is3D),
+                coordinates: ApiImpl.decodePath(path.snapped_waypoints as string, is3D, multiplier),
             }
-        else return path.snapped_waypoints as LineString
+        } else return path.snapped_waypoints as LineString
     }
 
     private static setPointsOnInstructions(path: Path) {
@@ -304,7 +385,7 @@ export class ApiImpl implements Api {
         }
     }
 
-    private static decodePath(encoded: string, is3D: boolean): number[][] {
+    private static decodePath(encoded: string, is3D: boolean, multiplier: number): number[][] {
         const len = encoded.length
         let index = 0
         const array: number[][] = []
@@ -345,10 +426,14 @@ export class ApiImpl implements Api {
                 } while (b >= 0x20)
                 const deltaEle = result & 1 ? ~(result >> 1) : result >> 1
                 ele += deltaEle
-                array.push([lng * 1e-5, lat * 1e-5, ele / 100])
-            } else array.push([lng * 1e-5, lat * 1e-5])
+                array.push([lng / multiplier, lat / multiplier, ele / 100])
+            } else array.push([lng / multiplier, lat / multiplier])
         }
         return array
+    }
+
+    public static isFootLike(profile: string) {
+        return profile.includes('hike') || profile.includes('foot')
     }
 
     public static isBikeLike(profile: string) {
@@ -356,10 +441,37 @@ export class ApiImpl implements Api {
     }
 
     public static isMotorVehicle(profile: string) {
-        return profile.includes('car') || profile.includes('truck') || profile.includes('scooter')
+        return (
+            profile.includes('car') ||
+            profile.includes('truck') ||
+            profile.includes('scooter') ||
+            profile.includes('bus') ||
+            profile.includes('motorcycle')
+        )
     }
 
     public static isTruck(profile: string) {
         return profile.includes('truck')
+    }
+
+    public static getBBoxPoints(points: Coordinate[]): Bbox | null {
+        const bbox: Bbox = points.reduce(
+            (res: Bbox, c) => [
+                Math.min(res[0], c.lng),
+                Math.min(res[1], c.lat),
+                Math.max(res[2], c.lng),
+                Math.max(res[3], c.lat),
+            ],
+            [180, 90, -180, -90] as Bbox
+        )
+        if (points.length == 1) {
+            bbox[0] = bbox[0] - 0.001
+            bbox[1] = bbox[1] - 0.001
+            bbox[2] = bbox[2] + 0.001
+            bbox[3] = bbox[3] + 0.001
+        }
+
+        // return null if the bbox is not valid, e.g. if no url points were given at all
+        return bbox[0] < bbox[2] && bbox[1] < bbox[3] ? bbox : null
     }
 }

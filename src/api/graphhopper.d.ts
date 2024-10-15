@@ -1,5 +1,5 @@
 import { LineString } from 'geojson'
-import { CustomModel } from '@/stores/QueryStore'
+import { Coordinate, CustomModel } from '@/stores/QueryStore'
 
 // minLon, minLat, maxLon, maxLat
 export type Bbox = [number, number, number, number]
@@ -16,6 +16,7 @@ export interface RoutingRequest {
     profile: string
     locale: string
     points_encoded: boolean
+    points_encoded_multiplier: number
     instructions: boolean
     elevation: boolean
     'alternative_route.max_paths'?: number
@@ -76,6 +77,7 @@ export interface BasePath {
     readonly ascend: number
     readonly descend: number
     readonly points_encoded: boolean
+    readonly points_encoded_multiplier: number
     readonly bbox?: Bbox
     readonly instructions: Instruction[]
     readonly details: Details
@@ -89,6 +91,7 @@ export interface Instruction {
     readonly points: number[][]
     readonly sign: number
     readonly text: string
+    readonly motorway_junction: string
     readonly time: number
 }
 
@@ -98,9 +101,26 @@ interface Details {
     readonly max_speed: [number, number, number][]
     readonly road_class: [number, number, string][]
     readonly road_environment: [number, number, string][]
+    readonly road_access: [number, number, string][]
+    readonly access_conditional: [number, number, string][]
+    readonly foot_conditional: [number, number, string][]
+    readonly bike_conditional: [number, number, string][]
     readonly track_type: [number, number, string][]
     readonly country: [number, number, string][]
     readonly get_off_bike: [number, number, boolean][]
+    readonly mtb_rating: [number, number, boolean][]
+    readonly hike_rating: [number, number, boolean][]
+}
+
+export interface TagHash {
+    [key: string]: string
+}
+
+export interface ReverseGeocodingHit {
+    readonly tags: TagHash
+    readonly type: string
+    readonly id: number
+    readonly point: Coordinate
 }
 
 export interface GeocodingResult {
@@ -109,7 +129,7 @@ export interface GeocodingResult {
 }
 
 export interface GeocodingHit {
-    readonly point: { lat: number; lng: number }
+    readonly point: Coordinate
     readonly extent: Bbox
     readonly osm_id: string
     readonly osm_type: string

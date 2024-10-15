@@ -19,6 +19,7 @@ export default class RouteStore extends Store<RouteStoreState> {
                 type: 'LineString',
             },
             points_encoded: false,
+            points_encoded_multiplier: 1e5,
             snapped_waypoints: {
                 type: 'LineString',
                 coordinates: [],
@@ -31,9 +32,15 @@ export default class RouteStore extends Store<RouteStoreState> {
                 toll: [],
                 road_environment: [],
                 road_class: [],
+                road_access: [],
+                access_conditional: [],
+                foot_conditional: [],
+                bike_conditional: [],
                 track_type: [],
                 country: [],
                 get_off_bike: [],
+                mtb_rating: [],
+                hike_rating: [],
             },
             distance: 0,
             points_order: [],
@@ -42,11 +49,8 @@ export default class RouteStore extends Store<RouteStoreState> {
         }
     }
 
-    private readonly queryStore: QueryStore
-
-    constructor(queryStore: QueryStore) {
+    constructor() {
         super(RouteStore.getInitialState())
-        this.queryStore = queryStore
     }
 
     reduce(state: RouteStoreState, action: Action): RouteStoreState {
